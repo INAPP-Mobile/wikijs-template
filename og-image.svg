@@ -1,23 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#1A1B1E"/>
-      <stop offset="100%" stop-color="#25262B"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="860" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0a0b10"/>
+      <stop offset="50%" stop-color="#141520"/>
+      <stop offset="100%" stop-color="#0f1018"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#E53B79" stop-color="#9F40FF"/>
+    <linearGradient id="bar" x1="430" y1="0" x2="430" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E53B79"/>
+      <stop offset="50%" stop-color="#C05AAF"/>
+      <stop offset="100%" stop-color="#9F40FF"/>
     </linearGradient>
   </defs>
   <rect width="1200" height="630" fill="url(#bg)"/>
-  <rect width="1200" height="6" fill="url(#accent)"/>
-  <circle cx="1050" cy="100" r="300" fill="#9F40FF" opacity="0.06"/>
-  <circle cx="150" cy="500" r="250" fill="#E53B79" opacity="0.04"/>
-  <!-- Book icon -->
-  <g transform="translate(100, 315)">
+  <rect x="487" y="0" width="6" height="630" rx="3" fill="url(#bar)" opacity=".75">
+    <animate attributeName="opacity" values=".75;.95;.75" dur="4s" repeatCount="indefinite"/>
+  </rect>
+  <g transform="translate(280, 315)">
     <path d="M-65,-80 Q-45,-65 -25,-80 L-25,60 Q-45,75 -65,60 Z" stroke="#E53B79" stroke-width="10" fill="none" stroke-linejoin="round"/>
     <path d="M25,-80 Q45,-65 65,-80 L65,60 Q45,75 25,60 Z" stroke="#E53B79" stroke-width="10" fill="none" stroke-linejoin="round"/>
-    <line x1="0" y1="-75" x2="0" y2="55" stroke="#E53B79" stroke-width="6"/>
+    <line x1="0" y1="-75" x2="0" y2="55" stroke="#9F40FF" stroke-width="6"/>
   </g>
-  <text x="600" y="280" text-anchor="middle" fill="white" font-size="74" font-weight="bold" font-family="system-ui, -apple-system, sans-serif" letter-spacing="2">Wiki.js</text>
-  <text x="600" y="350" text-anchor="middle" fill="#B0B8C8" font-size="30" font-family="system-ui, -apple-system, sans-serif" letter-spacing="1">Modern Wiki &amp; Knowledge Base</text>
 </svg>
