@@ -20,5 +20,9 @@
         "healthCheckTimeout": 180
       }
     }
-  ]
+  ],
+  "source": {
+    "type": "dockerfile",
+    "dockerfilePath": "Dockerfile"
+  }
 }
