@@ -36,29 +36,57 @@ Wiki.js is one of the most popular open-source wiki solutions because it offers:
 3. Personal Notes and Planning — structured knowledge management for individuals
 4. Open Source Project Docs — public-facing documentation portals with versioning
 
-## Dependencies for Running This Template
+## Deploy
 
-This template runs Wiki.js as a single Docker container. For PostgreSQL database support:
+Click the button above to deploy Wiki.js on Railway. You will be prompted to:
 
-- A Railway account at https://railway.app
-- PostgreSQL companion database (add via Railway UI or CLI)
-- Environment variables set per template-vars.json
+1. Create a new project in your Railway workspace or select an existing one
+2. Wait for the automatic build and deployment (usually 1-3 minutes)
+3. Add a PostgreSQL service from the Integrations tab (Search "Postgres" in Marketplace, click Connect)
+4. Once deployed, access Wiki.js at `https://your-app-name.up.railway.app`
+5. Complete the setup wizard to create your admin account and configure settings
 
-No additional infrastructure needed — all data persists in the mounted volume automatically.
+### First-Time Setup
 
-Once deployed, access Wiki.js at your Railway-provided URL and create your first admin account on the setup wizard.
+After deployment:
+
+1. Browse to your Railway-provided URL (e.g., `https://wikijs-template-production.up.railway.app`)
+2. Create your first admin account via the setup wizard
+3. Configure your wiki — set site name, logo, language, and theme in Settings > General
+4. (Optional) Set up authentication — Wiki.js supports OAuth2, LDAP, SAML 2.0, OpenID Connect
+
+### Postgres Setup
+
+If using PostgreSQL:
+
+1. Add a Redis cache service for session storage (search "Redis" in Marketplace, click Connect)
+2. Set the `REDIS_HOST` variable to your Redis service host from the Variables tab
+3. Wiki.js will use the default database credentials (DB_USER, DB_PASS) on the wikijs-app service
 
 ## Configuration
 
 Copy .env.example to configure database credentials:
 
-- DB_ENGINE: Database engine (postgres, mysql, sqlite) — default postgres
-- DB_HOST: PostgreSQL/MySQL host — required when using postgres
-- DB_PORT: Database port — default 5432
-- DB_NAME: Database name — default wikijs
-- DB_USER: Database user — default wikijs
-- DB_PASS: Database password — auto-generated on first deploy
-- PORT: Service port (Railway sets automatically) — default 3000
-- APP_NAME: Display name of your wiki — default Wiki.js
-- TIMEZONE: Server timezone — default UTC
+- DB_ENGINE: Database engine (postgres, mysql, sqlite) - default postgres
+- DB_HOST: PostgreSQL/MySQL host - required when using postgres
+- DB_PORT: Database port - default 5432
+- DB_NAME: Database name - default wikijs
+- DB_USER: Database user - default wikijs
+- DB_PASS: Database password - auto-generated on first deploy
+- PORT: Service port (Railway sets automatically) - default 3000
+- APP_NAME: Display name of your wiki - default Wiki.js
+- TIMEZONE: Server timezone - default UTC
 - URL_BASE: Public URL (required after deploy for asset serving)
+
+## Troubleshooting
+
+**"Connection refused" on database:** Ensure you've connected a postgres service from the Integrations tab and the DB_HOST points to it.
+
+**Pages returning 404 or blank:** Set your `URL_BASE` in the Variables tab to match your deployed URL (including protocol).
+
+**White screen after setup:** Clear browser cache or try incognito mode; verify the database schema was updated on first boot by checking the build logs for "Database Connection Successful".
+
+## License
+
+This template is released under the [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html) license.
+Wiki.js itself (the application being deployed) is developed by requarks and licensed under AGPL-3.0 as well.
