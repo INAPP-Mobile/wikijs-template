@@ -29,4 +29,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
 
 EXPOSE 3000
 
-VOLUME ["/wiki/data"]
+
