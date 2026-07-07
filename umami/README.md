@@ -1,30 +1,28 @@
-# Umami - Simple Web Analytics Template for Railway
-
-> A lightweight, privacy-friendly analytics dashboard that you can deploy to Railway in minutes.
+# Umami
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template/umami)
 
+Umami is a lightweight, open-source web analytics platform that provides insights into your website traffic without compromising privacy. It's self-hosted, GDPR-compliant, and offers real-time statistics with no cookie walls.
+
 ## Features
 
-- 🚀 **One-click deployment** - Get up and running with zero configuration
-- 📊 **Real-time analytics** - Track page views, visitors, and more
-- 🔒 **Privacy-first** - No cookies or tracking scripts that violate user privacy
-- 🎨 **Clean dashboard** - Beautiful, intuitive interface for analyzing your data
-- ⚡ **Auto-updates** - Stay current with the latest Umami releases automatically
-- 💾 **Managed database** - PostgreSQL included via Railway's database add-on
+- **Real-time stats**: View live visitor counts, page views, and referrals instantly
+- **Lightweight & fast**: Minimal footprint using PostgreSQL or MySQL as backend
+- **Privacy-first**: No cookies required; fully GDPR compliant out-of-the-box
+- **Self-hosted**: Full control over your analytics data and infrastructure
+- **Easy deployment**: One-click deploy to Railway with automatic configuration
+- **Dashboard & API**: Beautiful UI plus RESTful API for custom integrations
 
 ## Configuration
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `DB_TYPE` | Database type (postgresql) | `postgresql` | No |
-| `PGHOST` | PostgreSQL host (auto-filled by Railway) | - | Yes (if not using managed db) |
-| `PGUSER` | PostgreSQL username | - | Yes (if not using managed db) |
-| `PGPASSWORD` | PostgreSQL password | - | Yes (if not using managed db) |
-| `PGDATABASE` | Database name | `umami` | No |
-| `APP_SECRET` | Application secret key for security | Auto-generated | No |
-| `TELEMETRY_ENABLED` | Enable anonymous usage tracking | `true` | No |
+| Variable           | Description                                  | Default     | Required |
+|--------------------|----------------------------------------------|-------------|----------|
+| `DATABASE_URL`     | PostgreSQL database connection string        | (none)      | ✅ Yes   |
+| `APP_URL`          | Public URL of your Umami instance            | (empty)     | ❌ No    |
+| `WEBSITE`          | Default website name for new dashboards      | My Website  | ❌ No    |
+| `SECRET_KEY`       | Secret key for session signing (auto-generated if empty) | (auto)      | ❌ No    |
+| `TRUST_PROXY`      | Enable reverse proxy header trust            | false       | ❌ No    |
 
 ## License
 
-This template is MIT licensed. See [LICENSE](LICENSE) for details.
+This template is provided under the [MIT License](https://opensource.org/licenses/MIT). Umami itself is licensed under the same terms.
