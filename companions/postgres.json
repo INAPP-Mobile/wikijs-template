@@ -1,0 +1,26 @@
+{
+  "DATABASE_URL": {
+    "value": "${{Postgres.DATABASE_URL}}",
+    "description": "PostgreSQL connection string. Auto-injected when a Railway Postgres service is added."
+  },
+  "PGHOST": {
+    "value": "${{Postgres.HOST}}",
+    "description": "PostgreSQL host address."
+  },
+  "PGPORT": {
+    "value": "${{Postgres.PORT}}",
+    "description": "PostgreSQL port (default: 5432)."
+  },
+  "PGUSER": {
+    "value": "${{Postgres.USER}}",
+    "description": "PostgreSQL username."
+  },
+  "PGPASSWORD": {
+    "value": "${{Postgres.PASSWORD}}",
+    "description": "PostgreSQL password."
+  },
+  "PGDATABASE": {
+    "value": "${{Postgres.NAME}}",
+    "description": "PostgreSQL database name."
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "CLICKHOUSE_URL": {
+    "value": "http://clickhouse:8123",
+    "description": "ClickHouse HTTP endpoint. Default assumes a companion ClickHouse service named 'clickhouse'."
+  },
+  "CLICKHOUSE_DATABASE_URL": {
+    "value": "http://clickhouse:8123/plausible",
+    "description": "ClickHouse connection string with database name."
+  },
+  "CLICKHOUSE_HOST": {
+    "value": "clickhouse",
+    "description": "ClickHouse hostname. Default: clickhouse."
+  },
+  "CLICKHOUSE_PORT": {
+    "value": "8123",
+    "description": "ClickHouse HTTP port (default: 8123)."
+  },
+  "CLICKHOUSE_DB": {
+    "value": "plausible",
+    "description": "ClickHouse database name (default: plausible)."
+  }
+}

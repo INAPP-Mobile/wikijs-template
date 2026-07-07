@@ -1,0 +1,7 @@
+.env
+.env.local
+.DO_*.tfstate
+*.pem
+*.key
+.kube/
+.coolify-output/

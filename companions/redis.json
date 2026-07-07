@@ -1,0 +1,22 @@
+{
+  "REDIS_URL": {
+    "value": "${{Redis.REDIS_URL}}",
+    "description": "Redis connection string. Auto-injected when a Railway Redis service is added."
+  },
+  "REDISHOST": {
+    "value": "${{Redis.REDISHOST}}",
+    "description": "Redis host address."
+  },
+  "REDISPORT": {
+    "value": "${{Redis.REDISPORT}}",
+    "description": "Redis port (default: 6379)."
+  },
+  "REDISUSER": {
+    "value": "${{Redis.REDISUSER}}",
+    "description": "Redis username (default: default)."
+  },
+  "REDISPASSWORD": {
+    "value": "${{Redis.REDISPASSWORD}}",
+    "description": "Redis password. Auto-generated."
+  }
+}

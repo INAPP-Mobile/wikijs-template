@@ -1,0 +1,129 @@
+# =============================================================================
+# publish-lint.yml
+# Runs scripts/check-template-slug.sh on template-directory PRs.
+# This is the CI-side half of the kanboard-qa-test bug guard: the Publisher
+# agent in goal.md MUST also call the same script before any
+# `railway template publish` invocation.
+#
+# Triggers on any change under any railway-<name>/ directory whose path
+# matches the published-template convention. PRs that change schemata
+# (railway.json, railway.toml, README.md, Dockerfile, template-icon.svg,
+# .env.example, og-image.svg) all re-run the lint, but the lint itself
+# reads the directory name (which IS the intended slug).
+# =============================================================================
+name: Template Publish Lint
+
+on:
+  pull_request:
+    paths:
+      - 'railway-*/README.md'
+      - 'railway-*/railway.json'
+      - 'railway-*/railway.toml'
+      - 'railway-*/Dockerfile'
+      - 'railway-*/template-icon.svg'
+      - 'railway-*/.env.example'
+      - 'railway-*/og-image.svg'
+      - 'railway-*/docs/**'
+      - 'scripts/check-template-slug.sh'
+      - '.github/workflows/publish-lint.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'railway-*/README.md'
+      - 'railway-*/railway.json'
+      - 'railway-*/railway.toml'
+      - 'railway-*/Dockerfile'
+      - 'railway-*/template-icon.svg'
+      - 'railway-*/.env.example'
+      - 'railway-*/og-image.svg'
+      - 'scripts/check-template-slug.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-slug:
+    name: Reject QA / test / dev / staging slug suffixes
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install bash + coreutils (Ubuntu images have these by default; this is defensive)
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends bash coreutils
+
+      - name: Verify check-template-slug.sh presence + syntax
+        run: |
+          if [[ ! -f scripts/check-template-slug.sh ]]; then
+            echo "::error::scripts/check-template-slug.sh is missing"
+            exit 1
+          fi
+          bash -n scripts/check-template-slug.sh
+
+      - name: Discover template directory slugs to lint
+        id: discover
+        run: |
+          # A Railway template slug = the railway-<name> directory basename, minus the `railway-` prefix.
+          # We deliberately do NOT take the marketplace code from railway.json (the slug is
+          # inherited from the project name per guide.md §6.3 — so the directory name is what
+          # will end up in users' URLs).
+          set -euo pipefail
+          slugs=()
+          for dir in railway-*/; do
+            [[ -d "$dir" ]] || continue
+            # Skip the meta bundle (railway-coolify-deploy is a deploy harness, NOT a template)
+            if [[ "$dir" == "railway-coolify-deploy/" ]]; then
+              continue
+            fi
+            basename="${dir%/}"
+            slug="${basename#railway-}"
+            slugs+=("$slug")
+          done
+          if [[ ${#slugs[@]} -eq 0 ]]; then
+            echo "No railway-* template directories found — nothing to lint."
+            { echo 'slugs<<EOF'; echo ""; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "${slugs[@]}" > /tmp/discovered-slugs.txt
+            echo "Discovered slugs:"
+            printf '  - %s\n' "${slugs[@]}"
+            {
+              echo 'slugs<<EOF'
+              printf '%s\n' "${slugs[@]}"
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run lint against discovered slugs
+        if: steps.discover.outputs.slugs != ''
+        run: |
+          mapfile -t slugs < <(printf '%s\n' "${{ steps.discover.outputs.slugs }}")
+          if [[ ${#slugs[@]} -eq 0 ]]; then
+            echo "Empty slug list — bailing early."
+            exit 0
+          fi
+          chmod +x scripts/check-template-slug.sh
+          # The script exits 1 on any rejection. We want ALL failures to surface
+          # in a single run, so we capture and re-print.
+          set +e
+          scripts/check-template-slug.sh "${slugs[@]}"
+          ec=$?
+          set -e
+          if [[ $ec -ne 0 ]]; then
+            echo "::group::See docs/kanboard-rename-runbook.md for the bug this guard exists to prevent"
+            cat <<'EOM'
+The kanboard template was once published under `kanboard-qa-test` because
+Railway's `template publish` inherits the project name. This guard rejects
+slugs containing QA / test / dev / staging markers so the same bug cannot
+happen again. Use a clean slug like `memos`, `gotify`, `kanboard`.
+EOM
+            echo "::endgroup::"
+            exit 1
+          fi
+
+      - name: Lint passed
+        if: success()
+        run: |
+          echo "All Railway template slugs passed publish-quality lint."
