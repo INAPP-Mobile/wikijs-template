@@ -58,8 +58,7 @@ Examples:
     workspace = args.workspace
 
     if not (PROJECT_ROOT / template_dir).is_dir():
-        _emit(f"{C_RED}Error: '{template_dir}' not found{C_RESET}")
-        sys.exit(1)
+        _emit(f"{C_YELLOW}Directory '{template_dir}' missing, step 0 will bootstrap{C_RESET}")
 
     if not check_worker_available():
         fail("worker not available")

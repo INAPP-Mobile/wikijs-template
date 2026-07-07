@@ -1,15 +1,11 @@
-# Umami v2.15.0 — bump when updating
-FROM ghcr.io/umami-software/umami:postgresql-v2.15.0
+# Umami — bump when updating
+FROM alpine:3.20
 
-LABEL org.opencontainers.image.source="https://github.com/INAPP-Mobile/railway-umami"
-
-ENV PORT=3000
-ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/umami"
-
-EXPOSE 3000
+ENV PORT=8080
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-3000}/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/ || exit 1
 
 USER node
 

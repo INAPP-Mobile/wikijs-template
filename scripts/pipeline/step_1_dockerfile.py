@@ -18,13 +18,17 @@ def step_1_dockerfile(template_dir: str, no_pause: bool = False) -> bool:
 
     final = content
 
+    # Phase 0: :latest tag
+    if ":latest" in final and "scratch:latest" not in final:
+        sub_step("Phase 0/5: Pin version...")
+        r = call_worker(f"Replace :latest tag with a pinned version (e.g. alpine:3.20). Return ONLY full Dockerfile:\n{final}", step_name="Step 0a")
+        if r:
+            final = clean_llm_output(r)
+
     # Phase 1: USER directive
     if "USER " not in final or "USER root" in final:
-        sub_step("Phase 1/4: USER...")
-        r = call_worker(
-            f"Add non-root USER (node or 1000) to this Dockerfile. Return ONLY the full Dockerfile:\n{final}",
-            step_name="Step 1a"
-        )
+        sub_step("Phase 1/5: USER...")
+        r = call_worker(f"Add non-root USER (node or 1000) to this Dockerfile. Return ONLY the full Dockerfile:\n{final}", step_name="Step 1a")
         if r:
             final = clean_llm_output(r)
 
