@@ -1,0 +1,46 @@
+{
+  "DB_HOST": {
+    "value": "${{Postgres.HOST}}",
+    "description": "PostgreSQL database host. Auto-injected from Railway Postgres companion."
+  },
+  "DB_PORT": {
+    "value": "${{Postgres.PORT}}",
+    "description": "PostgreSQL database port. Auto-injected from Railway Postgres companion."
+  },
+  "DB_NAME": {
+    "value": "${{Postgres.NAME}}",
+    "description": "Database name for Wiki.js data. Auto-injected from Railway Postgres companion."
+  },
+  "DB_USER": {
+    "value": "${{Postgres.USER}}",
+    "description": "Database user for Wiki.js. Auto-injected from Railway Postgres companion."
+  },
+  "DB_PASS": {
+    "value": "${{Postgres.PASSWORD}}",
+    "description": "Database password. Auto-injected from Railway Postgres companion."
+  },
+  "PORT": {
+    "value": "3000",
+    "description": "Port Wiki.js listens on (default: 3000)."
+  },
+  "APP_NAME": {
+    "value": "Wiki.js",
+    "description": "Display name for your wiki."
+  },
+  "TIMEZONE": {
+    "value": "UTC",
+    "description": "Server timezone (e.g., America/New_York, Europe/London)."
+  },
+  "URL_BASE": {
+    "value": "",
+    "description": "Public URL of your wiki. Required for proper asset serving."
+  },
+  "DB_TYPE": {
+    "value": "postgres",
+    "description": "Database engine: postgres, mysql, mssql, or sqlite (default: postgres)."
+  },
+  "DB_FILEPATH": {
+    "value": "/wiki/data/wikijs.db",
+    "description": "Path for SQLite database file when using DB_TYPE=sqlite."
+  }
+}

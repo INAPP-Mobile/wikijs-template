@@ -8,33 +8,33 @@ from .core import step_header, ok, warn
 def step_6_deploy(template_dir: str) -> bool:
     step_header("Step 6", "Deploy")
 
-    import os
-    env = {**os.environ, "RAILWAY_WORKSPACE": _get_workspace(template_dir)}
+    # Ensure directory exists
+    Path(template_dir).mkdir(parents=True, exist_ok=True)
 
-    # Try link
+    # Check linked
     link_check = subprocess.run(
         ["railway", "project", "link"],
         cwd=template_dir,
         capture_output=True, text=True, timeout=15,
-        env=env,
     )
 
     if link_check.returncode != 0:
         warn("No project linked, creating one...")
         name = _detect_name(template_dir)
 
+        # Create project
         create = subprocess.run(
-            ["railway", "project", "create", "--name", name],
+            ["railway", "init", "--name", name, "--json"],
             capture_output=True, text=True, timeout=60,
-            env=env,
         )
         if create.returncode != 0:
             warn(f"Create: {create.stderr[:200]}")
 
+        # Link project
         relink = subprocess.run(
             ["railway", "project", "link", "--project", name],
+            cwd=template_dir,
             capture_output=True, text=True, timeout=60,
-            env=env,
         )
         if relink.returncode != 0:
             warn(f"Link: {relink.stderr[:100]}")
@@ -44,7 +44,6 @@ def step_6_deploy(template_dir: str) -> bool:
         ["railway", "up"],
         cwd=template_dir,
         capture_output=True, text=True, timeout=120,
-        env=env,
     )
     if r.returncode != 0:
         if "already exists" in r.stderr.lower():
@@ -56,18 +55,8 @@ def step_6_deploy(template_dir: str) -> bool:
     return True
 
 
-def _get_workspace(template_dir: str) -> str:
-    """Get workspace from railway.json or default INAPP."""
-    rj = Path(template_dir) / ".railway" / "project.json"
-    if rj.is_file():
-        try:
-            return json.loads(rj.read_text()).get("workspace", "INAPP")
-        except Exception:
-            pass
-    return "INAPP"
-
-
 def _detect_name(template_dir: str) -> str:
+    """Get project name from railway.json or directory."""
     rj_path = Path(template_dir) / "railway.json"
     if rj_path.is_file():
         try:
