@@ -1561,6 +1561,22 @@ https://raw.githubusercontent.com/<owner>/<repo>/main/template-icon.svg
 
 Regenerating a template (`railway templates create --project <id>`) reads the project's **runtime state** and destroys all dashboard editor fixes (buckets, variable defaults, icons, rootDirectory). **Generate once, then only use the dashboard editor.** See `railway-template-variables` skill for full details.
 
+### Template Macro Resolution Matrix (Marketplace Deploys)
+
+Confirmed across three deploy tests (positive-kindness, divine-laughter, hospitable-wisdom):
+
+| Macro | Resolves? |
+|-------|:---:|
+| `${{RAILWAY_PUBLIC_DOMAIN}}` | ✅ Domain only |
+| `${{secret(N)}}` | ✅ Random value |
+| `${{Postgres.DATABASE_URL}}` | ❌ Empty |
+| `${{Postgres.POSTGRES_*}}` | ❌ Empty |
+| `${{clickhouse.CLICKHOUSE_*}}` | ❌ Empty |
+
+**Key insight:** Only template-native macros resolve. ALL cross-service references (Postgres plugin vars, ClickHouse companion vars) resolve to empty. This affects every template with companion databases.
+
+**Verified template fix:** `https://${{RAILWAY_PUBLIC_DOMAIN}}` prefix works — confirmed in hospitable-wisdom deploy. See `railway-template-variables` skill for full macro reference.
+
 ## Template Publish Flow (NOT automate)
 
 1. Build+test locally (step 4)
