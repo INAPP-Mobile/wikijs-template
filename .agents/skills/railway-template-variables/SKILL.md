@@ -564,70 +564,89 @@ railway variables set --service <app-id> \
 
 **This applies to ALL `railway up` deployments, not just Plausible.** Template macros (`${{RAILWAY_PUBLIC_DOMAIN}}`, `${{secret(N)}}`, `${{Postgres.*}}`, `${{clickhouse.*}}`) ALL resolve to empty with `railway up`. Use concrete values for CLI deploys.
 
+## Marketplace Deploy: Macro Resolution Matrix (2026-07-08)
+
+Confirmed across three deploy tests (positive-kindness, divine-laughter, hospitable-wisdom):
+
+| Macro | Resolves? |
+|-------|:---:|
+| `${{RAILWAY_PUBLIC_DOMAIN}}` | ✅ Domain only (no protocol) |
+| `${{secret(N)}}` | ✅ Generates random value |
+| `${{Postgres.DATABASE_URL}}` | ❌ Empty string |
+| `${{Postgres.POSTGRES_*}}` | ❌ Empty string |
+| `${{clickhouse.CLICKHOUSE_*}}` | ❌ Empty string |
+
+**Key insight:** Only template-native macros (`RAILWAY_PUBLIC_DOMAIN`, `secret`) resolve. Cross-service references (Postgres plugin vars, ClickHouse companion vars) ALL resolve to empty. This is not a Postgres-specific limitation — it affects EVERY cross-service reference.
+
 ## Marketplace Deploy Issues: Three Persistent Template Bugs (2026-07-08)
 
-These three issues happen on EVERY marketplace deploy from templates with Postgres + ClickHouse + companion services. Confirmed across two deploy tests (positive-kindness and divine-laughter).
+These three issues happen on EVERY marketplace deploy from templates with Postgres + ClickHouse + companion services. Confirmed across three deploy tests (positive-kindness, divine-laughter, hospitable-wisdom).
 
 ### 1. `${{RAILWAY_PUBLIC_DOMAIN}}` Resolves Without `https://`
 
-**Symptom:** Plausible CE crashes with `** (RuntimeError) BASE_URL configuration option required` or gets a bare domain `plausible-ce-production-xxxx.up.railway.app` instead of `https://plausible-ce-production-xxxx.up.railway.app`.
+**Symptom:** Plausible CE crashes with `** (RuntimeError) BASE_URL configuration option required` when BASE_URL is `${{RAILWAY_PUBLIC_DOMAIN}}` — the macro resolves to just the domain without protocol.
 
-**Root cause:** The `${{RAILWAY_PUBLIC_DOMAIN}}` macro resolves to just the domain, without the `https://` protocol prefix. Apps that validate URL format (like Plausible CE) reject the bare domain.
+**Confirmed template fix:** Use `https://${{RAILWAY_PUBLIC_DOMAIN}}` as the default. **Verified working in marketplace deploy** (hospitable-wisdom test — BASE_URL resolved to `https://plausible-ce-production-2557.up.railway.app` correctly).
 
-**Fix:** Always set `BASE_URL` manually post-deploy with the `https://` prefix:
+**Post-deploy fix:**
 ```bash
 railway variables set --service "Plausible CE" "BASE_URL=https://$FULL_DOMAIN"
 ```
-
-**Template workaround (UNTESTED):** Use `https://${{RAILWAY_PUBLIC_DOMAIN}}` as the default value. WARNING: this has NOT been verified to resolve correctly at deploy time — it may double-prefix if the macro ever returns a full URL. Safer approach: let the app prepend `https://` in startup logic, or fix post-deploy.
 
 ### 2. `${{Postgres.DATABASE_URL}}` Resolves to Empty String
 
 **Symptom:** DATABASE_URL is empty on the deployed Plausible CE service, causing DB connection failures and `(DBConnection.ConnectionError)` crashes during migration.
 
-**Root cause:** The `${{Postgres.DATABASE_URL}}` macro does NOT resolve during marketplace deploys — the template variable reference to the Postgres plugin returns an empty string. The Postgres plugin hides its credentials and DATABASE_URL cannot be retrieved through any CLI or GraphQL method.
+**Root cause:** The `${{Postgres.DATABASE_URL}}` macro does NOT resolve during marketplace deploys. The Postgres plugin's env vars are NOT auto-populated by the system in template deploys — confirmed by the user.
 
-**Fix (post-deploy only):** Create a sibling Postgres service with known credentials — do NOT delete the broken plugin (deletion can cascade into PGDATA corruption). Wire the main service to the new sibling:
+**Potential template fix (UNTESTED):** Set Postgres variables directly in the Postgres service's template Raw JSON with a KNOWN password, then hardcode the matching DATABASE_URL on the main service:
+```json
+// Postgres service Raw JSON:
+{
+  "POSTGRES_PASSWORD": { "value": "plausible2026", "description": "Superuser password" },
+  "POSTGRES_DB": { "value": "railway", "description": "Default database" },
+  "POSTGRES_USER": { "value": "postgres", "description": "Superuser" }
+}
+
+// Plausible CE Raw JSON:
+{
+  "DATABASE_URL": {
+    "value": "postgresql://postgres:plausible2026@postgres.railway.internal:5432/railway",
+    "description": "PostgreSQL connection URL"
+  }
+}
+```
+**Why both sides must match:** Don't use `${{secret(24)}}` for POSTGRES_PASSWORD — the random value can't be referenced from Plausible's DATABASE_URL since cross-service macros don't resolve. Use the same literal password on both services.
+
+**Caveat:** Unclear whether the Postgres plugin accepts template form variables to override its auto-generated password. If it ignores them, the post-deploy fix (below) is still required.
+
+**Post-deploy fix (confirmed working):** Create a sibling PostgresDB with known password — keep the broken plugin (deletion can cascade into PGDATA corruption):
 ```bash
-# 1. Create a new PostgresDB service with known password via GraphQL:
-#    serviceCreate with image: postgres:16-alpine
-# 2. Set variables on the new service: POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_USER
-# 3. Construct and set DATABASE_URL on the main service:
-#    postgresql://postgres:<password>@postgresdb.railway.internal:5432/railway
-# 4. Keep the broken Postgres plugin as-is (it's harmless when unused)
+# 1. Create PostgresDB service: serviceCreate with image: postgres:16-alpine
+# 2. Set variables on new service: POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_USER
+# 3. Set DATABASE_URL: postgresql://postgres:<password>@postgresdb.railway.internal:5432/railway
 ```
 
-**WARNING:** Do NOT use `variableUpsert` to set `POSTGRES_PASSWORD` on the existing Postgres plugin. This corrupts the PGDATA path and crashes Postgres. Always create a NEW service with credentials set at creation time.
-
-**Template limitation:** No template-level fix exists. Postgres plugin credentials are auto-generated and hidden. Every deploy requires manual intervention or a post-deploy script.
+**WARNING:** NEVER use `variableUpsert` to set `POSTGRES_PASSWORD` on an existing Postgres plugin. This corrupts the PGDATA path and crashes Postgres.
 
 ### 3. `CLICKHOUSE_DATABASE_URL` Missing User:Password Credentials
 
 **Symptom:** Plausible CE crashes with `Authentication failed: password is incorrect, or there is no user with such name` when connecting to ClickHouse as user `default`.
 
-**Root cause:** The template form's default `CLICKHOUSE_DATABASE_URL=http://clickhouse:8123/plausible` has no user:password authentication. ClickHouse is configured with `CLICKHOUSE_USER=plausible` and `CLICKHOUSE_PASSWORD=${{secret(24)}}`, but the connection URL doesn't reference these. Plausible tries to connect as `default` user with no password and gets rejected.
+**Root cause:** The template form's default `CLICKHOUSE_DATABASE_URL=http://clickhouse:8123/plausible` has no user:password authentication. **The `${{clickhouse.CLICKHOUSE_USER}}:${{clickhouse.CLICKHOUSE_PASSWORD}}` companion references also resolve to empty in marketplace deploys** (same platform limitation as `${{Postgres.*}}`).
 
-**Correct template form default:**
-```json
-"CLICKHOUSE_DATABASE_URL": {
-  "value": "http://${{clickhouse.CLICKHOUSE_USER}}:${{clickhouse.CLICKHOUSE_PASSWORD}}@clickhouse:8123/plausible",
-  "description": "ClickHouse connection URL with service-level credentials"
-}
-```
+**No template-level fix exists** — companion service variable references don't resolve in marketplace deploys. The hardcoded URL is equally broken (connects as `default` user). The only working approach is post-deploy manual intervention:
 
-**Prerequisite:** `${{clickhouse.CLICKHOUSE_USER}}` and `${{clickhouse.CLICKHOUSE_PASSWORD}}` references require `companion-mapping.json` to be properly configured. Without companion-mapping, these references resolve to empty strings — the same failure mode as DATABASE_URL.
-
-**Fix (post-deploy):** Get ClickHouse credentials and set the URL manually:
 ```bash
+# Get ClickHouse credentials
 railway variables --service ClickHouse --kv  # get CLICKHOUSE_USER, CLICKHOUSE_PASSWORD
+# Set the connection URL with actual credentials
 railway variables set --service "Plausible CE" \
   "CLICKHOUSE_DATABASE_URL=http://$USER:$PASS@clickhouse:8123/plausible"
 ```
 
-**This is the ONLY template-level fixable issue of the three.** Update `template-editor-raw.json` and the per-service Raw JSON to use companion service variable references instead of a hardcoded URL.
-
 | Issue | Template Fixable? | Post-Deploy Fix |
 |-------|:--:|-----------------|
-| BASE_URL missing https:// | Yes (prefix `https://` in default) | `railway variables set BASE_URL=https://...` |
-| DATABASE_URL empty | ❌ Platform limitation | Recreate Postgres with known password |
-| CLICKHOUSE_DATABASE_URL no creds | ✅ Use `${{clickhouse.*}}` references | Get creds from ClickHouse service vars |
+| BASE_URL missing https:// | ✅ Use `https://` prefix (confirmed) | `railway variables set BASE_URL=https://...` |
+| DATABASE_URL empty | ⚠️ Set Postgres vars in form (untested) | Create PostgresDB with known password |
+| CLICKHOUSE_DATABASE_URL no creds | ❌ `${{clickhouse.*}}` resolves empty too | Get creds from ClickHouse service vars |
