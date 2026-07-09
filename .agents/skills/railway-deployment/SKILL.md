@@ -1536,6 +1536,16 @@ railway templates create --project <id> --json
 
 **The root-level Raw JSON** (template-wide, not per-service) DOES accept `buckets` and the full `services` structure. See `railway-template-variables` skill for the full editor variable format reference.
 
+### UI Widget Settings Don't Propagate to Marketplace Deploys
+
+**Dashboard UI widget settings are ignored during marketplace deploys.** The serializedConfig (what the template actually deploys) only reflects root-level Raw JSON edits — not UI widget changes:
+
+- `rootDirectory` set via widget → `null` in serializedConfig → wrong Dockerfile built
+- `volumeMounts` set via widget → not in serializedConfig → no volume
+- `icon` set via widget → not in serializedConfig → no icon
+
+**Fix:** Edit root-level Raw JSON directly for these settings. See `railway-template-variables` skill for detailed table.
+
 ### Service Icons: `simpleicons.org` URLs Don't Work — Use Raw GitHub
 
 **`https://simpleicons.org/icons/<name>.svg` returns HTML, not raw SVG.** This appears as a broken/default placeholder icon (e.g., SourceForge). Use the raw GitHub CDN instead:

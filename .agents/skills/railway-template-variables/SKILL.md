@@ -534,6 +534,20 @@ These service-level settings must be configured through the dashboard **UI widge
 
 **The root-level Raw JSON** (template-wide, not per-service) DOES accept `buckets` and the full `services` structure — but per-service Raw JSON is variables-only.
 
+### Dashboard UI Widgets Don't Apply to Marketplace Deploys
+
+**Settings configured via dashboard UI widgets do NOT propagate to marketplace deploys.** Confirmed:
+
+| Setting | UI Widget | Applies to Deploy? |
+|---------|-----------|:---:|
+| `rootDirectory` | Service tile → Settings → Source → Root Directory | ❌ Confirmed |
+| `volumeMounts` | Service tile → Add Volume → Mount Path + Size | ❌ (inferred) |
+| `icon` | Service tile → icon URL field | ❌ (inferred) |
+
+**The ONLY way to set these for marketplace deploys** is in the **root-level Raw JSON** (the full `serializedConfig`). The per-service Raw JSON only accepts variables, and the UI widgets don't persist to the template definition used during deploys.
+
+**Symptom:** ClickHouse built from root Dockerfile (Plausible CE) because `rootDirectory` was set via UI widget but `serializedConfig` showed `null`. App crashes with `BASE_URL configuration option is required` — a Plausible error in the ClickHouse service.
+
 ## Pitfall: `${{Postgres.DATABASE_URL}}` Resolves Empty with `railway up`
 
 **Symptom:** App crashes because DATABASE_URL is empty, even though Postgres plugin is running.
