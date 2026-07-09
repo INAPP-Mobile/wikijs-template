@@ -4,7 +4,7 @@
 
 ## The Mistake Pattern
 
-This project (`/var/home/ihshim523/Work/railway`) is a **collection of submodules**, each in its own subdirectory (`railway-plausible/`, `railway-ghost/`, `railway-n8n/`, etc.). The parent repo's `master` branch contains gitlink pointers to each submodule's commit hash.
+This project (`/var/home/ihshim523/Work/railway`) is a **collection of submodules**, each in its own subdirectory (`railway-plausible/`, `railway-n8n/`, `railway-open-webui/`, etc.). The parent repo's `master` branch contains gitlink pointers to each submodule's commit hash.
 
 The parent repo's only configured remote is `origin-wikijs`, pointing to `INAPP-Mobile/wikijs-template.git` — a separate repository used as a collection host.
 

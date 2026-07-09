@@ -116,6 +116,56 @@ Config files committed to Git retain their local mode. ClickHouse reads config a
 600 config.d/*.xml   # causes "Access to file denied" crash
 ```
 
+## Volume Mount Ownership (EACCES at First Boot)
+
+**Symptom** (deploy crashes immediately, no build error):
+```
+EACCES: permission denied, copyfile '/usr/src/<app>/node_modules/<app>/settings.js' -> '/data/settings.js'
+```
+or
+```
+EACCES: permission denied, open '/data/config.json'
+```
+
+**Root cause:**
+- Railway-managed volumes mount at the configured path owned by `root:root`
+- Many base images (e.g. `nodered/node-red`, `linuxserver/*`, `nginxinc/nginx-unprivileged`) run as a non-root user (UID 1000, `nobody`, `node-red`, etc.) by default
+- The image's entrypoint tries to write to the volume on first boot (copying default config, creating a database, writing settings)
+- The non-root user lacks write permission on the volume root → `EACCES` → the app never starts
+
+**Fix (verified 2026-07-09, deployed as `node-red` template):**
+```dockerfile
+FROM docker.io/<image>:<tag>
+# ... your ENVs ...
+
+# Switch to root briefly to fix volume ownership at runtime,
+# then drop privileges back to the upstream user.
+USER root
+ENTRYPOINT ["/bin/sh", "-c", "chown -R <upstream-user>:<upstream-group> /<volume-path> && exec su <upstream-user> -p -c './entrypoint.sh \"$@\"' --"]
+```
+
+**Why each part is needed:**
+- `USER root` — `chown` requires root
+- `chown -R <user>:<group> /<path>` — fix volume ownership at **runtime** (NOT build time — Railway creates the volume at deploy time)
+- `exec su <user> -p -c '...'` — drop back to the upstream non-root user for the actual app
+- `-p` (preserve env) — **critical**, keeps Railway-injected `$PORT` so the app binds correctly
+- The trailing `--` — passes through CMD args even when Railway's CMD is empty (common gotcha)
+
+**Generalizability:** This is NOT app-specific. **Any base image that (a) runs as a non-root user by default AND (b) writes to a Railway-managed volume on first boot** will hit this crash. To check before scaffolding:
+```bash
+# 1. Inspect USER directive in base image
+podman run --rm --entrypoint /bin/sh <image> -c "cat /etc/passwd | grep -v nologin | head -5"
+# 2. Look for write targets in the entrypoint script
+podman run --rm --entrypoint /bin/sh <image> -c "cat /entrypoint.sh" | grep -E 'cp |mv |touch |mkdir |>>' | head -10
+```
+
+If the entrypoint writes to the volume mount path AND the user is non-root → apply the fix.
+
+**Pre-Flight Checklist gate (proposed step 7.5):** When adding a volume mount, check the base image's `USER` directive + entrypoint write targets. Mismatch → apply the chown-via-`su` pattern.
+
+**Alternative: COPY default config to a non-volume path**
+Some apps accept a `CONFIG_PATH` or similar env var. Pointing it to a non-volume path (e.g. `/tmp/<app>`) sidesteps the ownership issue but loses persistence across redeploys. Use only for non-critical state.
+
 ## Procedure to Create Template
 
 1. **Build services in repo** — ensure Dockerfile and railway.json files are correct per-service

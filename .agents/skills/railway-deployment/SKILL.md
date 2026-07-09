@@ -18,6 +18,30 @@ These are the **highest-priority rules** in this project. Violating them wastes 
 
 When in doubt, defer to `AGENTS.md` and ask the user.
 
+## ⚠️ Pre-Flight Checklist (12 steps — run BEFORE any template work)
+
+**This is the gate that prevents the trial-and-error patterns from past sessions (URL ordering crashes, raw-image sibling macro issues, 2-boot deadlocks, plugin-var leakage, lost+found PGDATA traps, duplicated template names, submodule push clobber, etc.).** Run the 12 steps in order; each has a "what to do" + "what to check" + "common gotcha" in `references/pre-flight-checklist.md`.
+
+**Project rules (1-2):**
+1. **AGENTS.md project rules** — icon = graphical-only, name = sentence case, template on DRAFT (not PUBLISHED), submodule remote verified
+2. **Auth + token health** — `unset RAILWAY_TOKEN && railway whoami` succeeds
+
+**Technical gates (3-9):**
+3. **TOML syntax** — `python3 -c "import tomllib; tomllib.load(open('railway.toml','rb'))"` (if `railway.toml` exists)
+4. **Upstream image inspection** — pull image, read entrypoint/CMD, find app dir with `podman run --rm ...`
+5. **Macro resolution plan** — list every `${{...}}` your template needs, map to the matrix (in `template-deploy-pitfalls.md`)
+6. **Init-time self-references** — does the app boot-call a local API that needs DB records? If yes → preconfig + 2-boot pattern
+7. **Volume mount geometry** — for raw Postgres/MySQL siblings, use parent-mount convention (NOT `/var/lib/postgresql/data`)
+8. **Two-file sync** — `template-vars.json` and `template-editor-raw.json` have identical keys
+9. **No plugin-var leakage** — `${{Postgres.DATABASE_URL}}` etc. are NOT in form files (Railway auto-injects)
+
+**Dedup + lifecycle (10-12):**
+10. **Dedup check** — does the template code already exist on Railway? (substring match in BOTH directions)
+11. **Clean slate before `templates create`** — no manual var overrides captured
+12. **Test deploy + final verification** — `railway up` + poll HTTP 200 + verify env vars resolved
+
+**For full commands, verification per step, and common gotchas: [`references/pre-flight-checklist.md`](references/pre-flight-checklist.md)**
+
 ## Reference Files
 
 For deep-dive context, see `references/`:
@@ -41,7 +65,9 @@ For deep-dive context, see `references/`:
 - `references/cli-deploy-missing-template-vars.md` — `railway up` does NOT inject template vars; app crashes without BASE_URL/SECRET_KEY_BASE
 - `references/railway-graphql-misleading-errors-and-verify-discipline.md` — **2026-07-08 lesson:** `templatePublish`/`templateUnpublish`/`projectDelete` return misleading `"Not Authorized"` or `"Problem processing request"` errors. The mutation may or may not have taken effect — ALWAYS verify with a separate read query. Includes which mutations are flaky vs which genuinely fail, and the verify-after-mutate discipline.
 - `references/railway-template-publish-workflow.md` — **2026-07-09 reference (NEW):** canonical end-to-end path from "no working template" → PUBLISHED marketplace listing. Stitched together from the existing gotcha references + the 2026-07-09 blinko session's NEW findings: the CLI auth boundary (Bearer works for queries; only `unset RAILWAY_TOKEN` + interactive shell works for writes); the `--readme-file <path>` requirement on `railway templates publish`; the `railway service source connect --image postgres:16-alpine --service <id>` CLI attach for plugin-managed services without changing volume mounts; the AGENTS.md-rule-3-vs-user-override dance.
-- `references/template-publish-fields-and-restrictions.md` — **2026-07-08 lesson:** Field-level constraints for `templatePublish` (75-char description limit, valid category enum, image URL must serve raw SVG/PNG, no `simpleicons.org` HTML). Plus: already-published templates are read-only via API — use dashboard template editor for readme/description/image updates.
+- `references/template-publish-fields-and-restrictions.md` — **2026-07-08 lesson:** Field-level constraints for `templatePublish` (75-char description limit, valid category enum, image URL must serve raw SVG/PNG, no `simpleicons.org` HTML). Plus: already-published templates are read-only via API — use dashboard template editor for readme/description/image updates. **2026-07-09 addendum:** Re-publishing a new draft actually UPDATES the existing published template in place (the `code` field is read-only after first publish) — to get a new code, you must unpublish + delete the old one first.
+- `references/2026-07-09-node-red-session-summary.md` — **2026-07-09 lessons:** (1) EACCES on Railway volumes when base image runs as non-root and writes to /data — fix with `USER root` + `chown` + `su -p` ENTRYPOINT. (2) `templatePublish` overwrites the existing published template rather than publishing a new draft — the original human-readable code is preserved. Full case study with diagnostic flow.
+- `references/multi-service-railway-config-reference.md` — verified working directory structure, file contents, volume mounts, variable injection table, entrypoint inspection procedure, filesystem permission pitfalls. **2026-07-09 addendum:** new "Volume Mount Ownership (EACCES at First Boot)" section — base images running as non-root that write to a volume on first boot need `USER root` + chown + `su` ENTRYPOINT fix.
 - `references/dashboard-publish-form-template.md` — **2026-07-09 lesson:** Exact structure of the dashboard's manual-publish form, validator section requirements (`# Deploy and Host`, `## About Hosting`, `## Common Use Cases`, `## Dependencies`, `## Why Deploy` — all with **lowercase appname** in headings, even though `AGENTS.md` rule 2 says sentence case for display names), required boilerplate for the "Why Deploy" section, and the workspace-level publish-block diagnostic + resolution path (file a ticket at <https://station.railway.com>, NOT `team@railway.app` — Railway explicitly does not handle this kind of issue over email; auto-responses from team@ redirect all general inquiries to station.railway.com).
 - `references/git-submodule-mistakes.md` — **2026-07-08 lesson:** Submodule vs parent commit separation. Wrong-remote push recovery via `git push --force-with-lease <remote> <previous-tip>:<branch>` (NOT `--force`). Submodule's own remote is unaffected by parent push mistakes.
 
@@ -100,7 +126,7 @@ The dashboard's UI gives clearer error messages per field and persists readme/de
 
 ### Pitfall: Submodule Pushes Require Remote Verification
 
-This project is a **collection of git submodules** (`railway-plausible/`, `railway-ghost/`, `railway-n8n/`, etc.) under a parent repo. The parent repo's `master` branch contains gitlink pointers.
+This project is a **collection of git submodules** (`railway-plausible/`, `railway-n8n/`, `railway-open-webui/`, etc.) under a parent repo. The parent repo's `master` branch contains gitlink pointers.
 
 **Mistake pattern:** Pushing a parent commit to a remote that was configured for a *different* submodule (e.g., pushing a parent commit to `origin-wikijs` which points to `wikijs-template.git` when the change only updated a different submodule's gitlink).
 
@@ -115,6 +141,50 @@ git push --force-with-lease origin-wikijs <PREVIOUS_TIP>:master
 ```
 
 `--force-with-lease` fails safely if someone else pushed in the meantime. `--force` clobbers concurrent work. The submodule's own remote is unaffected by the wrong parent push. See `references/git-submodule-mistakes.md` for the full recovery flow.
+
+## Pitfall: Base-Image Entrypoint EACCES on Railway Volumes (2026-07-09)
+
+**Symptom** (deploy crashes immediately, no build error):
+```
+EACCES: permission denied, copyfile '/usr/src/<app>/settings.js' -> '/data/settings.js'
+```
+
+**Root cause:** Railway-managed volumes mount at the configured path owned by `root:root`. Many base images (`nodered/node-red`, `linuxserver/*`, `nginx-unprivileged`, etc.) run as a non-root user (UID 1000) by default and try to write to the volume on first boot (copying default config, creating a database, writing settings). The non-root user lacks write permission on the volume root → `EACCES` → the app never starts.
+
+**Fix** (verified working 2026-07-09, deployed to marketplace as `node-red` template):
+```dockerfile
+USER root
+ENTRYPOINT ["/bin/sh", "-c", "chown -R <upstream-user>:<upstream-group> /<volume-path> && exec su <upstream-user> -p -c './entrypoint.sh \"$@\"' --"]
+```
+
+**Why each part is needed:**
+- `USER root` — the `chown` requires root
+- `chown -R <user>:<group> /<path>` — fix ownership at **runtime** (Railway creates the volume at deploy time, not build time)
+- `exec su <user> -p -c '...'` — drop back to non-root for the actual app
+- `-p` (preserve env) — **critical** to keep Railway-injected `$PORT`
+
+**Generalizable:** Any base image that (a) runs as non-root AND (b) writes to a volume on first boot will hit this. Diagnostic: `podman run --rm --entrypoint /bin/sh <image> -c "cat /entrypoint.sh" | grep -E 'cp |touch |>> '` then check if the write target is a volume mount.
+
+See `references/multi-service-railway-config-reference.md` § "Volume Mount Ownership (EACCES at First Boot)" for the full fix + alternative patterns.
+
+## Pitfall: `templatePublish` Overwrites the Existing Published Template (2026-07-09)
+
+**Symptom:** You create a fresh draft, run `railway templates publish <new-draft-code> --category ...`, and the marketplace URL still shows `https://railway.com/deploy/<old-code>`, not your new draft code. The new draft disappears.
+
+**Root cause:** `templatePublish` does NOT create a new marketplace listing. It **updates the existing published template in place**, and the `code` field is **read-only after first publish**. If a template with your project's name is already PUBLISHED in the workspace, your publish call updates that one (keeping the original code) and discards your new draft.
+
+**To get a NEW code, you must FIRST unpublish + delete the old template:**
+1. Unpublish via dashboard (API is unreliable): `https://railway.com/workspace/templates/<id>` → ⋮ → Unpublish
+2. Delete: `railway templates delete <id> --yes`
+3. Create fresh draft: `railway templates create --project <id> --json`
+4. Configure variables in dashboard
+5. Publish: `railway templates publish <new-code> ...`
+
+**The good case:** If you don't care about the code changing, the new Dockerfile + vars flow into the existing listing — the human-readable code in your README's "Deploy on Railway" button stays valid.
+
+**Misleading-error trap:** `templatePublish` often returns `"Not Authorized"` despite the mutation taking effect (per `railway-graphql-misleading-errors-and-verify-discipline.md`). Always verify with `curl -I https://railway.com/deploy/<code>` (HTTP 200 = live).
+
+See `references/template-publish-fields-and-restrictions.md` § "Re-Publishing Overwrites the Existing Published Template" for the full diagnostic flow.
 
 ## Pitfall: `railway.toml` Leaks `healthcheckPath` to ALL Services
 

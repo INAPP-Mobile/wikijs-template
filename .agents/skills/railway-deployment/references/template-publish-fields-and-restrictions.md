@@ -84,6 +84,55 @@ Get from any existing project: `query { project(id: "<PROJECT_ID>") { workspace 
 
 A public demo project. Skipped if you don't have one.
 
+## Re-Publishing Overwrites the Existing Published Template (No New Code)
+
+**Symptom (confirmed 2026-07-09):** You create a fresh draft via `railway templates create --project <id>`, run `railway templates publish <new-draft-code> --category ... --image ...`, and the marketplace URL is still `https://railway.com/deploy/<old-code>`, not your new draft code.
+
+**Root cause:** `templatePublish` does NOT create a new marketplace listing. It **updates the existing published template in place**, and the `code` field is **read-only after first publish**. If a template with your project's name is already PUBLISHED in the workspace, your publish call will:
+
+1. Update the existing template's `category`, `description`, `image`, `readme`, and the underlying Dockerfile source
+2. Keep the original `code` (the human-readable slug in the marketplace URL)
+3. Discard your new draft silently
+
+**How to get a NEW code (the only path):**
+1. Unpublish the old template first (dashboard only — API is unreliable for unpublish):
+   ```
+   https://railway.com/workspace/templates/<old-template-id>
+   → click ⋮ menu → "Unpublish"
+   ```
+2. Delete the unpublished template:
+   ```bash
+   railway templates delete <old-id> --yes
+   ```
+3. Create a fresh draft (will get a new random 6-char code):
+   ```bash
+   railway templates create --project <id> --json
+   ```
+4. Configure variables in the dashboard editor
+5. Publish with the new code:
+   ```bash
+   railway templates publish <new-code> --category ... --description ... --readme-file ... --image ...
+   ```
+
+**How to check if a template with your project name is already PUBLISHED:**
+```bash
+curl -sS -m 30 https://backboard.railway.com/graphql/v2 \
+  -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ templates(first: 50) { edges { node { id code name status } } } }"}' \
+  | python3 -c "import sys,json; [print(t['code'], t['name'], t['status']) for t in json.load(sys.stdin)['data']['templates']['edges']]"
+```
+
+**Misleading-error trap:** `templatePublish` often returns `"Not Authorized"` or `"Problem processing request"` (per `railway-graphql-misleading-errors-and-verify-discipline.md`). The mutation **may have taken effect** despite the error. Always verify with a separate read query:
+```bash
+# After publish, check the canonical marketplace URL
+curl -I "https://railway.com/deploy/<code>"   # HTTP 200 = live
+```
+
+**The good case (verified 2026-07-09):** If you don't care about the code staying the same (you just want the new Dockerfile + vars to flow into the existing listing), this behavior is actually convenient — the human-readable code in the README's "Deploy on Railway" button stays valid.
+
+**Cross-ref:** `2026-07-09-node-red-session-summary.md` Lesson 2 for the full case study.
+
 ## The Critical Constraint: Already-Published Updates Are Flaky
 
 **If the template is already in `PUBLISHED` state, calling `templatePublish` again does NOT reliably update all fields.**
@@ -159,8 +208,22 @@ The dashboard editor:
 - Lets you preview the marketplace page
 - Is the ONLY way to update the template's display name (the `name` field) without deleting + recreating
 
+## Workspace Block (Account-Level Publish Restriction)
+
+If `templatePublish` returns the error `You have been blocked from publishing templates. Please reach out to the team for more information.`, this is a **workspace/account-level restriction** — NOT a template-specific error. No template from the affected workspace can be published until Railway Support clears the block.
+
+**Diagnostic:** Try publishing a DIFFERENT draft from the same workspace. If both fail with the same error, it's a workspace block. Try a draft from a DIFFERENT workspace — if it succeeds, the first workspace is definitely blocked.
+
+**Resolution (as of 2026-07-09):** Open a support ticket at <https://station.railway.com> in the `Platform / Templates & Marketplace` category. Railway does **NOT** handle this kind of issue over email — auto-responses from `team@railway.app` redirect all general inquiries to station.railway.com, so retrying via email gets nowhere. Include:
+- Workspace name (e.g., `INAPP-Mobile`)
+- The exact error message
+- A template code so they can find the affected draft
+
+The publish will succeed on the FIRST retry once Support lifts the block. See `dashboard-publish-form-template.md` § "Workspace Block" for the full diagnostic flow.
+
 ## Related Files
 
+- `dashboard-publish-form-template.md` — **comprehensive ref for the dashboard publish form** (exact template structure, required H2 sections, lowercase-heading rule, validator rejection messages, workspace block)
 - `railway-graphql-misleading-errors-and-verify-discipline.md` — companion ref for the API error patterns
 - `railway-graphql-template-introspection.md` — `TemplatePublishInput` schema + introspection
 - `2026-06-29-railway-template-graphql-mutations.md` — older mutation reference
