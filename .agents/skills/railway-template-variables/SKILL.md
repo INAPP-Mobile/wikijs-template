@@ -482,6 +482,28 @@ Both `railway templates create` and `templateGenerate` produce templates where a
 
 **The editor REJECTS `defaultValue`/`isOptional` format** (which is what `templateGenerate` returns). Only `value`/`description` is accepted.
 
+### Per-Service Directory Layout — CURRENT (sibling-service pattern, 2026-07-08)
+
+```
+<template>/
+├── template-vars.json              # Pipeline source (defaultValue, isOptional)
+├── template-editor-raw.json        # Generated from template-vars.json
+├── plausible-ce.json               # → Paste into Plausible CE Raw JSON
+├── clickhouse/
+│   ├── Dockerfile
+│   ├── railway.json
+│   ├── template-vars.json          # Companion pipeline source
+│   └── template-editor-raw.json    # → Paste into ClickHouse Raw JSON
+└── postgres/                       # Sibling Postgres service (NEW 2026-07-08)
+    ├── Dockerfile                  # FROM postgres:16-alpine (upstream, NOT postgres-ssl:18)
+    ├── railway.json                # Minimal — no healthcheckPath
+    ├── template-vars.json          # POSTGRES_USER/PASSWORD/DB + PGDATA defaults
+    ├── template-editor-raw.json    # → Paste into Postgres tile Raw JSON
+    └── .env.example                # Documents parent-mount geometry rationale
+```
+
+**Why sibling service instead of postgres-ssl:18 plugin:** Railway volumes always have ext4 `lost+found/` at the volume root. The postgres-ssl:18 plugin forces the volume mount at `/var/lib/postgresql/data`, trapping lost+found/ inside PGDATA — initdb then crashes with `directory exists but is not empty`. The sibling postgres:16-alpine service uses the upstream entrypoint (no PGDATA path-prepend enforcement) and mounts at the parent path `/var/lib/postgresql`, so lost+found/ lives outside PGDATA. See `references/plausible-ce-and-postgres-docker-patterns.md` § "Lost+Found Gotcha".
+
 ### templateGenerate: What Survives vs What Gets Stripped
 
 `templateGenerate` reads project runtime variables. Behavior:

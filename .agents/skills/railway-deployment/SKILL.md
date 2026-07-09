@@ -8,6 +8,16 @@ tags: [railway, deployment, cli, template, devops, pipeline]
 
 Deploy projects, publish templates Railway marketplace. Covers the full lifecycle: scaffold, validate, build, deploy, troubleshoot, publish.
 
+## ⚠️ Core Agent Constraints (see AGENTS.md for source of truth)
+
+These are the **highest-priority rules** in this project. Violating them wastes hours of work and produces broken marketplace templates. Read them before any template work:
+
+- **Rule 1 — No text in icons.** Template icons must be **graphical only** — no `<text>`, no `<tspan>`, no rendered words. Match the existing icon style (e.g., `800×800` viewBox, `rx=120` rounded square, brand-aligned gradient).
+- **Rule 2 — Sentence case display name.** `"Plausible CE"`, not `"plausible-ce"`. Use sentence case unless the upstream project name itself is lower case.
+- **Rule 3 — Do NOT auto-publish.** Keep templates on **DRAFT** until issues are fully fixed. Publishing is irreversible via the API (`templateUnpublish` returns a misleading 500 wrapper — see `railway-graphql-misleading-errors-and-verify-discipline.md`).
+
+When in doubt, defer to `AGENTS.md` and ask the user.
+
 ## Reference Files
 
 For deep-dive context, see `references/`:
@@ -29,6 +39,82 @@ For deep-dive context, see `references/`:
 - `references/fix-broken-repo-template-workflow.md` — **fix broken repo → deploy → GitHub source → create draft** end-to-end workflow (Plausible fix pattern)
 - `references/railway-graphql-template-introspection.md` — inspect AND build templates via GraphQL API: full multi-service build recipe, mutation reference, serializedConfig format, literal-value-stripping gotcha
 - `references/cli-deploy-missing-template-vars.md` — `railway up` does NOT inject template vars; app crashes without BASE_URL/SECRET_KEY_BASE
+- `references/railway-graphql-misleading-errors-and-verify-discipline.md` — **2026-07-08 lesson:** `templatePublish`/`templateUnpublish`/`projectDelete` return misleading `"Not Authorized"` or `"Problem processing request"` errors. The mutation may or may not have taken effect — ALWAYS verify with a separate read query. Includes which mutations are flaky vs which genuinely fail, and the verify-after-mutate discipline.
+- `references/railway-template-publish-workflow.md` — **2026-07-09 reference (NEW):** canonical end-to-end path from "no working template" → PUBLISHED marketplace listing. Stitched together from the existing gotcha references + the 2026-07-09 blinko session's NEW findings: the CLI auth boundary (Bearer works for queries; only `unset RAILWAY_TOKEN` + interactive shell works for writes); the `--readme-file <path>` requirement on `railway templates publish`; the `railway service source connect --image postgres:16-alpine --service <id>` CLI attach for plugin-managed services without changing volume mounts; the AGENTS.md-rule-3-vs-user-override dance.
+- `references/template-publish-fields-and-restrictions.md` — **2026-07-08 lesson:** Field-level constraints for `templatePublish` (75-char description limit, valid category enum, image URL must serve raw SVG/PNG, no `simpleicons.org` HTML). Plus: already-published templates are read-only via API — use dashboard template editor for readme/description/image updates.
+- `references/dashboard-publish-form-template.md` — **2026-07-09 lesson:** Exact structure of the dashboard's manual-publish form, validator section requirements (`# Deploy and Host`, `## About Hosting`, `## Common Use Cases`, `## Dependencies`, `## Why Deploy` — all with **lowercase appname** in headings, even though `AGENTS.md` rule 2 says sentence case for display names), required boilerplate for the "Why Deploy" section, and the workspace-level publish-block diagnostic + resolution path (file a ticket at <https://station.railway.com>, NOT `team@railway.app` — Railway explicitly does not handle this kind of issue over email; auto-responses from team@ redirect all general inquiries to station.railway.com).
+- `references/git-submodule-mistakes.md` — **2026-07-08 lesson:** Submodule vs parent commit separation. Wrong-remote push recovery via `git push --force-with-lease <remote> <previous-tip>:<branch>` (NOT `--force`). Submodule's own remote is unaffected by parent push mistakes.
+
+## ⚠️ Top-Priority Pitfalls (2026-07-08 Lessons)
+
+These are the most important pitfalls to internalize. Read these before any template publish or submodule push.
+
+### Pitfall: API Errors Are Misleading — Always Verify With a Separate Query
+
+Railway's GraphQL API wraps many real errors (auth, scope, validation, internal server error) inside one of two misleading response shapes:
+
+- `"Not Authorized"` (no `errorExtensions.code`) — HTTP 500 INTERNAL_SERVER_ERROR
+- `"Problem processing request"` — HTTP 500 INTERNAL_SERVER_ERROR
+
+**You cannot tell from the error message which one happened.** The mutation may have succeeded, partially succeeded, or genuinely failed.
+
+**Affected mutations (verified 2026-07-08):**
+
+| Mutation | Symptom | Real outcome |
+|----------|---------|--------------|
+| `templatePublish` (first call) | `"Not Authorized"` 500 | **Mutation took effect** despite the error |
+| `templatePublish` (re-publish) | `"Not Authorized"` or `"Problem processing request"` | **Flaky.** Some fields update, others don't. |
+| `templateUnpublish` | `"Not Authorized"` 500 | Genuine failure. State remained PUBLISHED. |
+| `projectDelete` (production) | `"Not Authorized"` 500 | Genuine failure. Project verifiably still present. |
+| `variableUpsert` | `"Problem processing request"` 500 | Often does not take effect. Use `railway variable set` CLI. |
+
+**Fix:** After every mutation, immediately run a separate read query and compare state:
+
+```bash
+# 1. Run mutation
+curl ... -d '{"query":"mutation { templatePublish(...) {...} }", ...}'
+
+# 2. ALWAYS run a separate read query (don't trust the mutation response)
+curl ... -d '{"query":"query($id: String!) { template(id: $id) { code status description image readme } }", "variables":{"id":"<TEMPLATE_ID>"}}'
+```
+
+**Give up on the API for:** readme/description/image updates on already-published templates (use dashboard), unpublish (use dashboard), delete production project (use dashboard). See `references/railway-graphql-misleading-errors-and-verify-discipline.md` for the full debugging flow.
+
+### Pitfall: Already-Published Templates Are Read-Only Via API
+
+After a template is in `PUBLISHED` state, calling `templatePublish` again to update fields is **unreliable**:
+
+| Field | Update on re-publish? |
+|-------|----------------------|
+| `category` | Usually works |
+| `image` | Sometimes works (worked on 2nd attempt) |
+| `description` | Inconsistent (worked once, failed silently once) |
+| `readme` | **Often silently rejected.** Set to `null` or unchanged. |
+
+**The only reliable path is the dashboard template editor:**
+```
+https://railway.com/workspace/templates/<template-id>
+```
+
+The dashboard's UI gives clearer error messages per field and persists readme/description/image reliably. The API is fine for the **first** publish; for **updates**, use the dashboard. See `references/template-publish-fields-and-restrictions.md` for the full field constraints (75-char description, valid category enum, image URL rules, etc.).
+
+### Pitfall: Submodule Pushes Require Remote Verification
+
+This project is a **collection of git submodules** (`railway-plausible/`, `railway-ghost/`, `railway-n8n/`, etc.) under a parent repo. The parent repo's `master` branch contains gitlink pointers.
+
+**Mistake pattern:** Pushing a parent commit to a remote that was configured for a *different* submodule (e.g., pushing a parent commit to `origin-wikijs` which points to `wikijs-template.git` when the change only updated a different submodule's gitlink).
+
+**Consequence:** A wrong-remote push can be cleanly reverted with `git push --force-with-lease` (NOT `--force`) without touching the submodule's own remote:
+
+```bash
+# 1. Capture the previous tip BEFORE doing anything else
+git rev-parse origin-wikijs/master   # save this SHA
+
+# 2. Revert the wrong push
+git push --force-with-lease origin-wikijs <PREVIOUS_TIP>:master
+```
+
+`--force-with-lease` fails safely if someone else pushed in the meantime. `--force` clobbers concurrent work. The submodule's own remote is unaffected by the wrong parent push. See `references/git-submodule-mistakes.md` for the full recovery flow.
 
 ## Pitfall: `railway.toml` Leaks `healthcheckPath` to ALL Services
 
@@ -397,7 +483,7 @@ railway link --project $PID
 railway up
 
 # Now create draft from clean project
-Plausible reads ALL env vars at runtime
+```
 ```
 
 ## New Pitfalls 2026-07 (from Plausible CE session)
@@ -496,7 +582,7 @@ For class-level pitfalls learned recently — BASE_URL empty crashes app, manual
 **Verify credentials resolve correctly after setting vars**:
 
 ```bash
-Plausible reads ALL env vars at runtime
+```
 ```
 
 ## New Pitfalls 2026-07 (from Plausible CE session)
@@ -606,7 +692,7 @@ Detect service needs from image name/tag BEFORE build:
 ```python
 # Pattern → service required
 r':(?:postgresql|postgres|mysql|mariadb|redis|mongo)' → external DB
-Plausible reads ALL env vars at runtime
+```
 ```
 
 ## New Pitfalls 2026-07 (from Plausible CE session)
@@ -678,7 +764,7 @@ railway variables --service plausible-ce --kv | grep DATABASE_URL
 
 Normalize names before comparison:
 ```python
-Plausible reads ALL env vars at runtime
+```
 ```
 
 ## New Pitfalls 2026-07 (from Plausible CE session)
@@ -748,7 +834,7 @@ railway variables --service plausible-ce --kv | grep DATABASE_URL
 Check substring match BOTH directions:
 ```python
 if normalized in val or val in normalized:
-    Plausible reads ALL env vars at runtime
+```
     ```
 
     ## New Pitfalls 2026-07 (from Plausible CE session)
@@ -892,7 +978,7 @@ Dedup checks:
 ```bash
 python scripts/pipeline.py umami      # correct
 python scripts/pipeline.py keycloak   # correct
-Plausible reads ALL env vars at runtime
+```
 ```
 
 ## New Pitfalls 2026-07 (from Plausible CE session)
@@ -1004,7 +1090,7 @@ On duplicate: HALT with "X already on Railway" message.
 
 ```dockerfile
 FROM ghcr.io/open-webui/open-webui:v0.10.2-slim  # pinned ✓
-Plausible reads ALL env vars at runtime
+```
 ```
 
 ## New Pitfalls 2026-07 (from Plausible CE session)
@@ -1077,7 +1163,7 @@ Auto-bump releases: edit Dockerfile `FROM` tag + republish.
 Convention:
 ```dockerfile
 # Umami v2.15.0 — bump when updating
-Plausible reads ALL env vars at runtime
+```
 ```
 
 ## New Pitfalls 2026-07 (from Plausible CE session)
@@ -1175,7 +1261,7 @@ Pipeline warns before build. User adds Postgres service → retry build.
 Local Hermes worker at `~/.local/bin/worker`. NOT pip-installable.
 
 ```bash
-Plausible reads ALL env vars at runtime
+```
 ```
 
 ## New Pitfalls 2026-07 (from Plausible CE session)
@@ -1249,7 +1335,7 @@ subprocess.run(
     ["worker", "-z", prompt],
     capture_output=True, text=True, timeout=600,
     stdin=subprocess.DEVNULL,  # prevents tcsetpgrp background hang
-Plausible reads ALL env vars at runtime
+```
 ```
 
 ## New Pitfalls 2026-07 (from Plausible CE session)
@@ -1441,8 +1527,10 @@ Each fix independently verifiable. Fast + reliable.
 <template>/
 ├── plausible-ce.json              # → Plausible CE service variables
 ├── clickhouse/template-editor-raw.json  # → ClickHouse service variables
-└── plausible-postgres.json        # → {} (plugin-managed, leave empty)
+└── postgres/template-editor-raw.json    # → Postgres sibling service variables (NEW: parent-mount geometry)
 ```
+
+**Sibling-service upgrade (2026-07-08):** The Railway `postgres-ssl:18` plugin was replaced by a sibling `postgres:16-alpine` service due to the ext4 `lost+found/` PGDATA-crash bug (see references/plausible-ce-and-postgres-docker-patterns.md § "Lost+Found Gotcha"). The sibling service uses a parent-mount geometry: volume mounted at `/var/lib/postgresql` (NOT `/var/lib/postgresql/data`), with `PGDATA=/var/lib/postgresql/data` as a subpath. This places the volume's lost+found/ at the volume root, outside PGDATA, where initdb sees an empty directory and proceeds.
 
 ### GraphQL Mutations Use `input` Wrapper Pattern
 
@@ -1596,3 +1684,4 @@ Confirmed across three deploy tests (positive-kindness, divine-laughter, hospita
 5. User runs manually: `railway templates publish <code> --category "AI/ML" --description "..." --readme-file README.md`
 
 Pipeline NEVER auto-publishes. User must manually trigger.
+```
