@@ -3,5 +3,6 @@
 2. Template display name must sentence case, not lower case unless absolutely required.
 3. DO NOT publish template unless issues fully fixed, keep it on draft template then fix it.
 4. Refer to relevant railway skills rather than guessing.
-5. Do not rapidly hit railway endpoints / cli requests to avoid rate limiting. 
+5. Do not rapidly hit railway endpoints / cli requests to avoid rate limiting, give a pause between consecutive calls. 
 6. Browser automation to railway dashboard is hard due to authentication, refrain from trying it.
+7. Always confirm `git ls-remote <url>` + `cat .git/config` before `git push` — the parent monorepo's `remote.origin-wikijs.url` may be misconfigured, so pushing there would clobber unrelated content.
