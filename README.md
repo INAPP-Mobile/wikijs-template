@@ -36,6 +36,12 @@ Wiki.js is one of the most popular open-source wiki solutions because it offers:
 3. Personal Notes and Planning — structured knowledge management for individuals
 4. Open Source Project Docs — public-facing documentation portals with versioning
 
+### Deployment Dependencies
+
+- A Railway account (sign up at https://railway.com)
+- No external API keys required — Wiki.js and PostgreSQL run entirely within Railway
+- The template provisions two services automatically: the Wiki.js app container and a PostgreSQL 16 database
+
 ## Dependencies for Running This Template
 
 This template runs Wiki.js as a single Docker container. For PostgreSQL database support:
