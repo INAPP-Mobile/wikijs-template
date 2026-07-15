@@ -1,7 +1,7 @@
 {
   "DB_HOST": {
-    "defaultValue": "db-postgres",
-    "description": "PostgreSQL database host. Use the companion PostgreSQL service name on Railway.",
+    "defaultValue": "postgres.railway.internal",
+    "description": "PostgreSQL database host. Points at the sibling 'Postgres' Railway service.",
     "isOptional": false
   },
   "DB_PORT": {
@@ -40,8 +40,8 @@
     "isOptional": true
   },
   "URL_BASE": {
-    "defaultValue": "",
-    "description": "Public URL of your wiki (required for proper asset serving). Set to http://your-domain.railway.app after deploy.",
+    "defaultValue": "https://${{RAILWAY_PUBLIC_DOMAIN}}",
+    "description": "Public URL of your wiki. Auto-populated from Railway's public domain.",
     "isOptional": true
   },
   "DB_TYPE": {

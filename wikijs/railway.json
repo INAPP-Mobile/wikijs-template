@@ -1,19 +1,19 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": ""
-  },
-  "settings": {
-    "lifecycle": "STARTUP",
-    "healthcheckPath": "/ping",
-    "restartPolicyType": "ALWAYS",
-    "startCommand": "node server/server.js"
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "wikijs/Dockerfile"
   },
   "deploy": {
-    "startDelay": 60,
-    "healthCheckPath": "/ping",
-    "restartPolicyType": "ALWAYS",
-    "healthCheckTimeout": 120
+    "healthcheckPath": "/ping",
+    "healthcheckTimeout": 120,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 5,
+    "volumeMounts": [
+      {
+        "name": "wikijs-data",
+        "mountPath": "/wiki/data"
+      }
+    ]
   }
 }
