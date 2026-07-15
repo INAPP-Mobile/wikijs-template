@@ -19,8 +19,12 @@ LABEL org.opencontainers.image.title="Wiki.js" \
 ENV WIKI_PORT=3000 \
     NODE_ENV=production \
     TZ=UTC \
-    DB_TYPE=sqlite \
-    DB_FILEPATH=/wiki/data/wikijs.db
+    DB_TYPE=postgres \
+    DB_HOST=postgres.railway.internal \
+    DB_PORT=5432 \
+    DB_NAME=wikijs \
+    DB_USER=postgres \
+    DB_PASS=postgres
 
 RUN mkdir -p /wiki/data && chown node:node /wiki/data
 
@@ -28,5 +32,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ping || exit 1
 
 EXPOSE 3000
-
-VOLUME ["/wiki/data"]
