@@ -1,9 +1,13 @@
 # =============================================================================
-# Dockerfile: Wiki.js 2.x on Railway – PostgreSQL primary, SQLite fallback
+# Dockerfile: Wiki.js 2.x on Railway (PostgreSQL)
 # Docker image source: https://hub.docker.com/r/requarks/wiki
 # Project:          https://github.com/requarks/wiki
 # License:          AGPL-3.0
 # =============================================================================
+# NOTE: Do NOT add a `VOLUME` instruction — Railway rejects it; use Railway
+# Volumes (volumeMounts in railway.json) instead.
+# NOTE: Do NOT add a custom `HEALTHCHECK` — Railway runs its own /ping check.
+# NOTE: Do NOT hardcode the listen port; Wiki.js reads the injected PORT env.
 
 FROM requarks/wiki:2.5.314
 
@@ -16,8 +20,7 @@ LABEL org.opencontainers.image.title="Wiki.js" \
       org.opencontainers.image.licenses="AGPL-3.0" \
       org.opencontainers.image.created="${BUILD_YEAR}-07-02T00:00:00Z"
 
-ENV WIKI_PORT=3000 \
-    NODE_ENV=production \
+ENV NODE_ENV=production \
     TZ=UTC \
     DB_TYPE=postgres \
     DB_HOST=postgres.railway.internal \
@@ -27,8 +30,5 @@ ENV WIKI_PORT=3000 \
     DB_PASS=postgres
 
 RUN mkdir -p /wiki/data && chown node:node /wiki/data
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ping || exit 1
 
 EXPOSE 3000
