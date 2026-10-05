@@ -9,7 +9,7 @@
 # NOTE: Do NOT add a custom `HEALTHCHECK` — Railway runs its own /ping check.
 # NOTE: Do NOT hardcode the listen port; Wiki.js reads the injected PORT env.
 
-FROM requarks/wiki:2.5.314
+FROM requarks/wiki:2.5.315
 
 ARG BUILD_YEAR=2026
 
